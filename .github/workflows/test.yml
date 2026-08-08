@@ -56,7 +56,7 @@ jobs:
 
           # 编译容器内用的测试程序（rpath 指向 /app）
           gcc -o /tmp/test_docker /tmp/test.c -L. -lViKey -Wl,-rpath,/app
-          cp libViKey.so /tmp/test_docker /tmp/
+          cp libViKey.so /tmp/
           mv /tmp/test_docker /tmp/test
 
           # 构建可复现的小镜像，跳过网络安装包以减少不稳定性
