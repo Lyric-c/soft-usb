@@ -1,0 +1,148 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # ── Linux amd64 (x86-64) ──────────────────────────────────────────
+  build-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build libViKey.so (linux/amd64)
+        run: |
+          CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey-linux-amd64.so .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libViKey-linux-amd64
+          path: libViKey-linux-amd64.so
+
+  # ── Linux arm64 ───────────────────────────────────────────────────
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install aarch64 cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build libViKey.so (linux/arm64)
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CC: aarch64-linux-gnu-gcc
+          CGO_ENABLED: 1
+        run: |
+          go build -buildmode=c-shared -o libViKey-linux-arm64.so .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libViKey-linux-arm64
+          path: libViKey-linux-arm64.so
+
+  # ── Linux loong64 (loong1 — 旧版 ABI，使用 loongnix Go 1.25.8 + GCC 8.3.0) ─
+  build-linux-loong1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download LoongArch64 GCC 8.3.0 Cross Toolchain
+        run: |
+          mkdir -p /tmp/loong-gcc8
+          curl -fsSL https://ftp.loongnix.cn/toolchain/gcc/release/loongarch/gcc8/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6.tar.xz \
+            | tar -Jxv -C /tmp/loong-gcc8 --strip-components=1
+
+      - name: Download LoongArch64 Go 1.25.8 (abi1.0)
+        run: |
+          mkdir -p /tmp/loong-go
+          curl -fsSL https://ftp.loongnix.cn/toolchain/golang/go-1.25/abi1.0/go1.25.8.linux-amd64.tar.gz \
+            | tar -zxv -C /tmp/loong-go --strip-components=1
+
+      - name: Build libViKey.so (linux/loong64-loong1)
+        env:
+          GOOS: linux
+          GOARCH: loong64
+          PATH: /tmp/loong-go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          CC: /tmp/loong-gcc8/bin/loongarch64-linux-gnu-gcc
+          CXX: /tmp/loong-gcc8/bin/loongarch64-linux-gnu-g++
+          CGO_ENABLED: 1
+        run: |
+          go version
+          go build -buildmode=c-shared -o libViKey-linux-loong64-loong1.so .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libViKey-linux-loong64-loong1
+          path: libViKey-linux-loong64-loong1.so
+
+  # ── Linux loong64 (loong2 — 新版，社区 GCC 15.1.0 + 标准 Go) ─────
+  build-linux-loong2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download LoongArch64 GCC 15.1.0 Cross Toolchain
+        run: |
+          mkdir -p /tmp/loong-gcc15
+          curl -fsSL https://github.com/loongson/build-tools/releases/download/2025.08.08/x86_64-cross-tools-loongarch64-binutils_2.45-gcc_15.1.0-glibc_2.42.tar.xz \
+            | tar -Jxv -C /tmp/loong-gcc15 --strip-components=1
+
+      - name: Build libViKey.so (linux/loong64-loong2)
+        env:
+          GOOS: linux
+          GOARCH: loong64
+          CC: /tmp/loong-gcc15/bin/loongarch64-linux-gnu-gcc
+          CXX: /tmp/loong-gcc15/bin/loongarch64-linux-gnu-g++
+          CGO_ENABLED: 1
+        run: |
+          go build -buildmode=c-shared -o libViKey-linux-loong64-loong2.so .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libViKey-linux-loong64-loong2
+          path: libViKey-linux-loong64-loong2.so
+
+  # ── Windows amd64 (x86-64) ────────────────────────────────────────
+  build-windows-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install mingw-w64 cross-compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      - name: Build ViKey.dll (windows/amd64)
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CC: x86_64-w64-mingw32-gcc
+          CGO_ENABLED: 1
+        run: |
+          go build -buildmode=c-shared -o ViKey-windows-amd64.dll .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ViKey-windows-amd64
+          path: ViKey-windows-amd64.dll
