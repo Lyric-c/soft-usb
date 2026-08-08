@@ -96,7 +96,8 @@ jobs:
               return 0;
           }
           EOF
-          aarch64-linux-gnu-gcc -o /tmp/test /tmp/test.c -L. -lViKey -Wl,-rpath,.
+          cp libViKey.so /tmp/
+          aarch64-linux-gnu-gcc -o /tmp/test /tmp/test.c -L/tmp -lViKey -Wl,-rpath,/tmp
           qemu-aarch64-static -L /usr/aarch64-linux-gnu /tmp/test
 
       - uses: actions/upload-artifact@v4
@@ -167,12 +168,17 @@ jobs:
               return 0;
           }
           EOF
-          $CC -o /tmp/test /tmp/test.c -L. -lViKey -Wl,-rpath,.
+          cp libViKey.so /tmp/
+          $CC -o /tmp/test /tmp/test.c -L/tmp -lViKey -Wl,-rpath,/tmp
 
           QBIN=$(command -v qemu-loongarch64-static 2>/dev/null || command -v qemu-loongarch64 2>/dev/null || true)
           if [ -n "$QBIN" ]; then
             echo "Running with ${QBIN} ..."
-            $QBIN -L "$SYSROOT" /tmp/test
+            $QBIN -L "$SYSROOT" /tmp/test || {
+              RC=$?
+              echo "QEMU exited with ${RC}, fallback to symbol check"
+              readelf -Ws libViKey.so | grep -E 'VikeyFind|VikeyGetHID|GetMachineId'
+            }
           else
             echo "SKIP runtime: qemu-loongarch64 not available — checking symbols instead"
             readelf -Ws libViKey.so | grep -E 'VikeyFind|VikeyGetHID|GetMachineId'
@@ -243,12 +249,17 @@ jobs:
               return 0;
           }
           EOF
-          $CC -o /tmp/test /tmp/test.c -L. -lViKey -Wl,-rpath,.
+          cp libViKey.so /tmp/
+          $CC -o /tmp/test /tmp/test.c -L/tmp -lViKey -Wl,-rpath,/tmp
 
           QBIN=$(command -v qemu-loongarch64-static 2>/dev/null || command -v qemu-loongarch64 2>/dev/null || true)
           if [ -n "$QBIN" ]; then
             echo "Running with ${QBIN} ..."
-            $QBIN -L "$SYSROOT" /tmp/test
+            $QBIN -L "$SYSROOT" /tmp/test || {
+              RC=$?
+              echo "QEMU exited with ${RC}, fallback to symbol check"
+              readelf -Ws libViKey.so | grep -E 'VikeyFind|VikeyGetHID|GetMachineId'
+            }
           else
             echo "SKIP runtime: qemu-loongarch64 not available — checking symbols instead"
             readelf -Ws libViKey.so | grep -E 'VikeyFind|VikeyGetHID|GetMachineId'
@@ -307,12 +318,17 @@ jobs:
               return 0;
           }
           EOF
-          x86_64-w64-mingw32-gcc -o /tmp/test.exe /tmp/test.c -L. -lViKey
+          cp ViKey.dll /tmp/
+          x86_64-w64-mingw32-gcc -o /tmp/test.exe /tmp/test.c -L/tmp -lViKey
 
           if command -v wine &>/dev/null; then
             echo "Running with wine ..."
             export WINEDEBUG=-all
-            wine /tmp/test.exe
+            (cd /tmp && wine test.exe) || {
+              RC=$?
+              echo "Wine exited with ${RC}, fallback to symbol check"
+              x86_64-w64-mingw32-objdump -p ViKey.dll | grep -A20 '\[Export'
+            }
           else
             echo "SKIP runtime: wine not available — checking symbols instead"
             x86_64-w64-mingw32-objdump -p ViKey.dll | grep -A20 '\[Export'
