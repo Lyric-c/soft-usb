@@ -73,11 +73,13 @@ jobs:
           GOOS: linux
           GOARCH: loong64
           PATH: /tmp/loong-go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-          CC: /tmp/loong-gcc8/bin/loongarch64-linux-gnu-gcc
-          CXX: /tmp/loong-gcc8/bin/loongarch64-linux-gnu-g++
           CGO_ENABLED: 1
         run: |
           go version
+          CC=$(find /tmp/loong-gcc8 -name '*-gcc' -type f | head -1)
+          CXX=$(find /tmp/loong-gcc8 -name '*-g++' -type f | head -1)
+          echo "CC=${CC}" && echo "CXX=${CXX}"
+          export CC CXX
           go build -buildmode=c-shared -o libViKey-linux-loong64-loong1.so .
 
       - uses: actions/upload-artifact@v4
@@ -105,10 +107,12 @@ jobs:
         env:
           GOOS: linux
           GOARCH: loong64
-          CC: /tmp/loong-gcc15/bin/loongarch64-linux-gnu-gcc
-          CXX: /tmp/loong-gcc15/bin/loongarch64-linux-gnu-g++
           CGO_ENABLED: 1
         run: |
+          CC=$(find /tmp/loong-gcc15 -name '*-gcc' -type f | head -1)
+          CXX=$(find /tmp/loong-gcc15 -name '*-g++' -type f | head -1)
+          echo "CC=${CC}" && echo "CXX=${CXX}"
+          export CC CXX
           go build -buildmode=c-shared -o libViKey-linux-loong64-loong2.so .
 
       - uses: actions/upload-artifact@v4
