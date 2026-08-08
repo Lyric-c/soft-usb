@@ -45,6 +45,32 @@ jobs:
           gcc -o /tmp/test /tmp/test.c -L. -lViKey -Wl,-rpath,.
           /tmp/test
 
+      - name: Test in Docker (mount host per README, 100×)
+        run: |
+          cat > /tmp/Dockerfile << 'DEOF'
+          FROM debian:bookworm-slim
+          WORKDIR /app
+          COPY libViKey.so test ./
+          CMD ["./test"]
+          DEOF
+
+          # 编译容器内用的测试程序（rpath 指向 /app）
+          gcc -o /tmp/test_docker /tmp/test.c -L. -lViKey -Wl,-rpath,/app
+          cp libViKey.so /tmp/test_docker /tmp/
+          mv /tmp/test_docker /tmp/test
+
+          # 构建可复现的小镜像，跳过网络安装包以减少不稳定性
+          docker build -t soft-usb-test -f /tmp/Dockerfile /tmp
+
+          # 按 README 收集挂载参数（源路径不存在则跳过）
+          MOUNTS=""
+          [ -f /etc/machine-id ]    && MOUNTS="$MOUNTS -v /etc/machine-id:/etc/machine-id:ro"
+          [ -d /sys/class/dmi/id ]  && MOUNTS="$MOUNTS -v /sys/class/dmi/id:/sys/class/dmi/id:ro"
+          [ -d /sys/block ]         && MOUNTS="$MOUNTS -v /sys/block:/sys/block:ro"
+
+          echo "Mounts: ${MOUNTS:-none}"
+          docker run --rm $MOUNTS soft-usb-test
+
       - uses: actions/upload-artifact@v4
         with:
           name: libViKey-linux-amd64
