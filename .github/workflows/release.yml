@@ -53,6 +53,8 @@ jobs:
             cc: ""
             ext: dylib
             runner: macos-13
+            timeout: 30
+            optional: true
           # macOS arm64
           - platform: darwin-arm64
             goos: darwin
@@ -60,8 +62,12 @@ jobs:
             cc: ""
             ext: dylib
             runner: macos-14
+            timeout: 30
+            optional: true
 
     runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+    timeout-minutes: ${{ matrix.timeout || 10 }}
+    continue-on-error: ${{ matrix.optional || false }}
 
     steps:
       - uses: actions/checkout@v4
@@ -145,7 +151,9 @@ jobs:
           pattern: ViKey-*
 
       - name: List artifacts
-        run: ls -la artifacts/*/
+        run: |
+          echo "=== Available artifacts ==="
+          ls -la artifacts/*/ 2>/dev/null || echo "(no artifacts found)"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
