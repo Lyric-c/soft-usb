@@ -160,6 +160,32 @@ docker run \
 
 不挂载时降级使用 CPU 型号 + 镜像层的 machine-id，同宿主上 ID 稳定但区分度低（无法区分不同宿主）。
 
+## 项目结构
+
+三层分离，各自可独立修改：
+
+```
+main.go              C 接口导出层 — VikeyFind / VikeyGetHID / GetMachineId / DebugIdentifiers / FreeString
+softkey.go           核心算法层 — 采集调度、SHA-256 哈希、uint32 转换、去重工具函数
+machineid_linux.go   平台采集层（Linux）— /etc/machine-id、DMI、/proc/cpuinfo、磁盘序列号
+machineid_darwin.go  平台采集层（macOS）— ioreg IOPlatformUUID、system_profiler 序列号
+machineid_windows.go 平台采集层（Windows）— 注册表 MachineGuid、wmic BIOS/CPU
+```
+
+**调用链**：
+
+```
+VikeyGetHID (main.go)
+  └→ machineIdUint32 (softkey.go)
+       └→ getMachineId (softkey.go)
+            └→ collectIdentifiers() (各平台 machineid_*.go)
+            └→ hashIdentifiers() — NUL 分隔 + SHA-256 (softkey.go)
+
+GetMachineId (main.go) → getMachineId (softkey.go)
+DebugIdentifiers (main.go) → debugIdentifiers (softkey.go) → collectIdentifiers (各平台)
+FreeString (main.go) → C.free，供跨语言调用方安全释放内存
+```
+
 ## 依赖
 
 - **无运行时依赖**：.so/.dll 自包含 Go runtime，无需安装任何第三方包
