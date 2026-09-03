@@ -1,0 +1,20 @@
+# Build artifacts
+*.so
+*.dll
+*.dylib
+
+# CGO generated header (auto-generated from Go exports)
+libViKey.h
+
+# Go build cache
+*.test
+*.out
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Temporary build outputs
+/tmp/

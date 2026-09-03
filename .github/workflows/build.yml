@@ -146,3 +146,41 @@ jobs:
         with:
           name: ViKey-windows-amd64
           path: ViKey-windows-amd64.dll
+
+  # ── macOS amd64 (x86-64) ─────────────────────────────────────────
+  build-macos-amd64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build libViKey.dylib (darwin/amd64)
+        run: |
+          CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey-darwin-amd64.dylib .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libViKey-darwin-amd64
+          path: libViKey-darwin-amd64.dylib
+
+  # ── macOS arm64 (Apple Silicon) ──────────────────────────────────
+  build-macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build libViKey.dylib (darwin/arm64)
+        run: |
+          CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey-darwin-arm64.dylib .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libViKey-darwin-arm64
+          path: libViKey-darwin-arm64.dylib

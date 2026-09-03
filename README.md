@@ -18,8 +18,9 @@ uint32_t VikeyGetHID(uint16_t index, uint32_t* pdwHID);
 此外还导出两个排障辅助函数：
 
 ```c
-char* GetMachineId();       // 完整 64 位 hex 机器 ID（调用方 free()）
-char* DebugIdentifiers();   // 采集到的原始硬件标识（调用方 free()）
+char* GetMachineId();       // 完整 64 位 hex 机器 ID（调用方 FreeString()）
+char* DebugIdentifiers();   // 采集到的原始硬件标识（调用方 FreeString()）
+void  FreeString(char* s);  // 释放上述函数返回的 C 字符串（推荐跨语言调用方使用）
 ```
 
 ## 设计原理
@@ -95,7 +96,6 @@ char* DebugIdentifiers();   // 采集到的原始硬件标识（调用方 free()
 ### Linux → libViKey.so
 
 ```bash
-cd cmd/soft-usb
 CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey.so .
 ```
 
@@ -104,7 +104,6 @@ CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey.so .
 在 **Windows 命令提示符**（需安装 TDM-GCC 或 MSYS2 mingw-w64）：
 
 ```cmd
-cd cmd\soft-usb
 set CGO_ENABLED=1
 go build -buildmode=c-shared -o ViKey.dll .
 ```
@@ -112,7 +111,6 @@ go build -buildmode=c-shared -o ViKey.dll .
 ### macOS → libViKey.dylib
 
 ```bash
-cd cmd/soft-usb
 CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey.dylib .
 ```
 
@@ -127,7 +125,6 @@ CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey.dylib .
 ## 测试
 
 ```bash
-cd cmd/soft-usb
 CGO_ENABLED=1 go build -buildmode=c-shared -o /tmp/libViKey.so .
 
 cat > /tmp/test.c << 'EOF'

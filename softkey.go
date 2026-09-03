@@ -13,11 +13,15 @@
 //
 // 构建（Linux → .so）：
 //
-//	CGO_ENABLED=1 go build -buildmode=c-shared -o libsoftkey.so ./cmd/soft-usb/
+//	CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey.so .
 //
 // 构建（Windows → .dll，需在 Windows 上执行或配置 mingw 交叉编译器）：
 //
-//	CGO_ENABLED=1 go build -buildmode=c-shared -o softkey.dll ./cmd/soft-usb/
+//	CGO_ENABLED=1 go build -buildmode=c-shared -o ViKey.dll .
+//
+// 构建（macOS → .dylib）：
+//
+//	CGO_ENABLED=1 go build -buildmode=c-shared -o libViKey.dylib .
 package main
 
 import (

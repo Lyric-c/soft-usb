@@ -17,6 +17,7 @@ package main
 
 /*
 #include <stdint.h>
+#include <stdlib.h>
 */
 import "C"
 import "unsafe"
@@ -41,8 +42,7 @@ func VikeyGetHID(index C.uint16_t, pdwHID *C.uint32_t) C.uint32_t {
 }
 
 // GetMachineId 返回完整 64 位十六进制机器 ID 字符串（排障用）。
-//
-// 返回值由调用方通过 free() 释放。
+// 返回值由调用方通过 FreeString() 释放。
 //
 //export GetMachineId
 func GetMachineId() *C.char {
@@ -51,8 +51,7 @@ func GetMachineId() *C.char {
 }
 
 // DebugIdentifiers 返回采集到的全部原始硬件标识（排障用）。
-//
-// 返回值由调用方通过 free() 释放。
+// 返回值由调用方通过 FreeString() 释放。
 //
 //export DebugIdentifiers
 func DebugIdentifiers() *C.char {
@@ -77,6 +76,14 @@ func VikeyGetType(index C.uint16_t, pType *C.uint32_t) C.uint32_t {
 	_ = index
 	_ = unsafe.Pointer(pType)
 	return 0x80000016 // VIKEY_ERROR_NO_SUPPORT
+}
+
+// FreeString 释放由 GetMachineId / DebugIdentifiers 返回的 C 字符串。
+// 跨语言调用方应使用此函数释放内存，避免跨 DLL 边界 free() 导致堆损坏。
+//
+//export FreeString
+func FreeString(s *C.char) {
+	C.free(unsafe.Pointer(s))
 }
 
 func main() {}
