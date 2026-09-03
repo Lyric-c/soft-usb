@@ -14,10 +14,8 @@ on:
         default: false
 
 jobs:
-  # ── 编译 + 打包 ────────────────────────────────────────────────
+  # ── Linux + Windows 编译 + 打包 ────────────────────────────────
   build:
-    # 跳过 macOS job（未勾选 include_macos 时）
-    if: "!startsWith(matrix.platform, 'darwin') || inputs.include_macos == true"
     strategy:
       fail-fast: false
       matrix:
@@ -52,28 +50,9 @@ jobs:
             goarch: amd64
             cc: x86_64-w64-mingw32-gcc
             ext: dll
-          # macOS amd64
-          - platform: darwin-x86_64
-            goos: darwin
-            goarch: amd64
-            cc: ""
-            ext: dylib
-            runner: macos-13
-            timeout: 30
-            optional: true
-          # macOS arm64
-          - platform: darwin-arm64
-            goos: darwin
-            goarch: arm64
-            cc: ""
-            ext: dylib
-            runner: macos-14
-            timeout: 30
-            optional: true
 
-    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
-    timeout-minutes: ${{ matrix.timeout || 10 }}
-    continue-on-error: ${{ matrix.optional || false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -144,9 +123,60 @@ jobs:
           name: ViKey-${{ matrix.platform }}
           path: ViKey-${{ matrix.platform }}.zip
 
+  # ── macOS 编译 + 打包（独立 job，受 inputs.include_macos 控制） ─
+  build-macos:
+    if: inputs.include_macos == true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-x86_64
+            goos: darwin
+            goarch: amd64
+            ext: dylib
+            runner: macos-13
+          - platform: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            ext: dylib
+            runner: macos-14
+
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # ── 编译 ──────────────────────────────────────────────
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+        run: |
+          go build -buildmode=c-shared -o "libViKey.${{ matrix.ext }}" .
+
+      # ── 打包压缩 ──────────────────────────────────────────
+      - name: Package zip
+        run: |
+          ZIP_NAME="ViKey-${{ matrix.platform }}.zip"
+          zip "$ZIP_NAME" "libViKey.${{ matrix.ext }}"
+          ls -la "$ZIP_NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ViKey-${{ matrix.platform }}
+          path: ViKey-${{ matrix.platform }}.zip
+
   # ── 创建 Release 并上传全部产物 ────────────────────────────────
   release:
-    needs: build
+    needs: [build, build-macos]
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
