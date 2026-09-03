@@ -16,6 +16,8 @@ on:
 jobs:
   # ── 编译 + 打包 ────────────────────────────────────────────────
   build:
+    # 跳过 macOS job（未勾选 include_macos 时）
+    if: "!startsWith(matrix.platform, 'darwin') || inputs.include_macos == true"
     strategy:
       fail-fast: false
       matrix:
@@ -117,7 +119,6 @@ jobs:
 
       # ── 编译 ──────────────────────────────────────────────
       - name: Build
-        if: "!startsWith(matrix.platform, 'darwin') || inputs.include_macos == true"
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -132,7 +133,6 @@ jobs:
 
       # ── 打包压缩 ──────────────────────────────────────────
       - name: Package zip
-        if: "!startsWith(matrix.platform, 'darwin') || inputs.include_macos == true"
         run: |
           BINARY="${{ matrix.goos == 'windows' && 'ViKey' || 'libViKey' }}.${{ matrix.ext }}"
           ZIP_NAME="ViKey-${{ matrix.platform }}.zip"
@@ -140,7 +140,6 @@ jobs:
           ls -la "$ZIP_NAME"
 
       - uses: actions/upload-artifact@v4
-        if: "!startsWith(matrix.platform, 'darwin') || inputs.include_macos == true"
         with:
           name: ViKey-${{ matrix.platform }}
           path: ViKey-${{ matrix.platform }}.zip
