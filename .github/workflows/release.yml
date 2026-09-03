@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag（如 v1.0.0）"
+        required: true
+        type: string
+
+jobs:
+  # ── 编译 + 打包 ────────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux amd64
+          - platform: linux-x86_64
+            goos: linux
+            goarch: amd64
+            cc: ""
+            ext: so
+          # Linux arm64
+          - platform: linux-arm64
+            goos: linux
+            goarch: arm64
+            cc: aarch64-linux-gnu-gcc
+            ext: so
+          # Linux loong64 loong1
+          - platform: linux-loong64-loong1
+            goos: linux
+            goarch: loong64
+            cc: loong8
+            ext: so
+          # Linux loong64 loong2
+          - platform: linux-loong64-loong2
+            goos: linux
+            goarch: loong64
+            cc: loong15
+            ext: so
+          # Windows amd64
+          - platform: windows-x86_64
+            goos: windows
+            goarch: amd64
+            cc: x86_64-w64-mingw32-gcc
+            ext: dll
+          # macOS amd64
+          - platform: darwin-x86_64
+            goos: darwin
+            goarch: amd64
+            cc: ""
+            ext: dylib
+            runner: macos-13
+          # macOS arm64
+          - platform: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            cc: ""
+            ext: dylib
+            runner: macos-14
+
+    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        if: matrix.cc != 'loong8' && matrix.cc != 'loong15'
+        with:
+          go-version-file: go.mod
+
+      # ── 安装交叉编译器 ──────────────────────────────────────
+      - name: Install aarch64 cross-compiler
+        if: matrix.cc == 'aarch64-linux-gnu-gcc'
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install mingw-w64 cross-compiler
+        if: matrix.cc == 'x86_64-w64-mingw32-gcc'
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      # ── LoongArch loong1: GCC 8.3.0 + Go 1.25.8 abi1.0 ─────
+      - name: Install LoongArch64 loong1 toolchain
+        if: matrix.cc == 'loong8'
+        run: |
+          mkdir -p /tmp/loong-gcc8
+          curl -fsSL https://ftp.loongnix.cn/toolchain/gcc/release/loongarch/gcc8/loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6.tar.xz \
+            | tar -Jxv -C /tmp/loong-gcc8 --strip-components=1
+
+          mkdir -p /tmp/loong-go
+          curl -fsSL https://ftp.loongnix.cn/toolchain/golang/go-1.25/abi1.0/go1.25.8.linux-amd64.tar.gz \
+            | tar -zxv -C /tmp/loong-go --strip-components=1
+
+          echo "CC_LOONG8=$(find /tmp/loong-gcc8 -name '*-gcc' -type f | head -1)" >> $GITHUB_ENV
+          echo "/tmp/loong-go/bin" >> $GITHUB_PATH
+
+      # ── LoongArch loong2: 社区 GCC 15.1.0 + 标准 Go ─────────
+      - name: Install LoongArch64 loong2 toolchain
+        if: matrix.cc == 'loong15'
+        run: |
+          mkdir -p /tmp/loong-gcc15
+          curl -fsSL https://github.com/loongson/build-tools/releases/download/2025.08.08/x86_64-cross-tools-loongarch64-binutils_2.45-gcc_15.1.0-glibc_2.42.tar.xz \
+            | tar -Jxv -C /tmp/loong-gcc15 --strip-components=1
+
+          echo "CC_LOONG15=$(find /tmp/loong-gcc15 -name '*-gcc' -type f | head -1)" >> $GITHUB_ENV
+
+      # ── 编译 ──────────────────────────────────────────────
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          CC: ${{ matrix.cc == 'loong8' && env.CC_LOONG8 || matrix.cc == 'loong15' && env.CC_LOONG15 || matrix.cc }}
+        run: |
+          OUTPUT="libViKey.${{ matrix.ext }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            OUTPUT="ViKey.${{ matrix.ext }}"
+          fi
+          go build -buildmode=c-shared -o "$OUTPUT" .
+
+      # ── 打包压缩 ──────────────────────────────────────────
+      - name: Package zip
+        run: |
+          BINARY="${{ matrix.goos == 'windows' && 'ViKey' || 'libViKey' }}.${{ matrix.ext }}"
+          ZIP_NAME="ViKey-${{ matrix.platform }}.zip"
+          zip "$ZIP_NAME" "$BINARY"
+          ls -la "$ZIP_NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ViKey-${{ matrix.platform }}
+          path: ViKey-${{ matrix.platform }}.zip
+
+  # ── 创建 Release 并上传全部产物 ────────────────────────────────
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: ViKey-*
+
+      - name: List artifacts
+        run: ls -la artifacts/*/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ViKey ${{ inputs.tag }}
+          draft: false
+          prerelease: false
+          files: artifacts/*/*.zip
